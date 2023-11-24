@@ -1,7 +1,8 @@
 const express = require('express');
-const cors = require('cors');
 const app = express();
+const cors = require('cors');
 require('dotenv').config();
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const port = process.env.PORT || 5000;
 
@@ -23,6 +24,24 @@ const client = new MongoClient(uri, {
     }
 });
 
+// Custom middleWare's
+
+const gateman = (req, res, next) => {
+    if (!req?.headers?.authorization) {
+        return res.status(401).send({ massage: "Unauthorized Access" })
+    }
+    const token = req?.headers?.authorization.split(' ')[1];
+    // console.log("token From middleware: ", token);
+    jwt.verify(token, process.env.JWT_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ massage: "Unauthorized Access" })
+
+        }
+        req.decoded = decoded;
+        next();
+    })
+}
+
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
@@ -30,12 +49,27 @@ async function run() {
 
         const usersCollection = client.db('TechDiscoveriaDB').collection('users');
 
+        // JsonWebToken Api's
+        app.post('/jwt', async (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.JWT_TOKEN_SECRET, { expiresIn: "1h" })
+            res.send({ token })
+        })
 
         // User's Api is here
 
         app.get('/users', async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result);
+        })
+
+        app.get('/users/:email', gateman, async(req, res)=>{
+            const email = req.params.email;
+            const query = {
+                email: email
+            }
+            const result = await usersCollection.findOne(query);
+            res.send(result.role);
         })
 
         app.post('/users', async (req, res) => {
