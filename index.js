@@ -3,7 +3,7 @@ const app = express();
 const cors = require('cors');
 require('dotenv').config();
 const jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 
 
@@ -12,8 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 
-// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.idotoa5.mongodb.net/?retryWrites=true&w=majority`;
-const uri = process.env.DB_URI
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.idotoa5.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -49,6 +48,24 @@ async function run() {
 
         const usersCollection = client.db('TechDiscoveriaDB').collection('users');
 
+
+        // Custom middleWare's
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+
+            const isAdmin = user?.role === "admin";
+
+            if (!isAdmin) {
+                return res.status(403).send({ message: "Forbidden access" });
+
+            }
+            next();
+        }
+
+
+
         // JsonWebToken Api's
         app.post('/jwt', async (req, res) => {
             const user = req.body;
@@ -58,12 +75,12 @@ async function run() {
 
         // User's Api is here
 
-        app.get('/users', async (req, res) => {
+        app.get('/users', gateman, verifyAdmin, async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result);
         })
 
-        app.get('/users/:email', gateman, async(req, res)=>{
+        app.get('/users/:email', gateman, async (req, res) => {
             const email = req.params.email;
             const query = {
                 email: email
@@ -88,6 +105,19 @@ async function run() {
                 res.send(result);
             }
 
+        })
+
+        app.patch('/users/:id', gateman, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const data = req.body;
+            const filter = { _id: new ObjectId(id) };
+            const updatedObject = {
+                $set: {
+                    role: data?.role
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedObject)
+            res.send(result);
         })
 
 
