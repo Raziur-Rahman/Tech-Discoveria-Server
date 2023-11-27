@@ -47,6 +47,7 @@ async function run() {
         await client.connect();
 
         const usersCollection = client.db('TechDiscoveriaDB').collection('users');
+        const productsCollection = client.db('TechDiscoveriaDB').collection('products');
 
 
         // Custom middleWare's
@@ -63,8 +64,6 @@ async function run() {
             }
             next();
         }
-
-
 
         // JsonWebToken Api's
         app.post('/jwt', async (req, res) => {
@@ -86,7 +85,7 @@ async function run() {
                 email: email
             }
             const result = await usersCollection.findOne(query);
-            res.send(result.role);
+            res.send(result?.role);
         })
 
         app.post('/users', async (req, res) => {
@@ -117,6 +116,21 @@ async function run() {
                 }
             }
             const result = await usersCollection.updateOne(filter, updatedObject)
+            res.send(result);
+        })
+
+        // products related api's
+
+        app.get('/products', async(req, res)=>{
+            const result = await productsCollection.find().toArray();
+            res.send(result);
+        })
+        app.get('/products/:id', async(req, res)=>{
+            const id = req.params.id;
+
+            const query = {_id: new ObjectId(id)};
+
+            const result = await productsCollection.findOne(query);
             res.send(result);
         })
 
