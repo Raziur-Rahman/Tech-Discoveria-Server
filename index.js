@@ -48,6 +48,7 @@ async function run() {
 
         const usersCollection = client.db('TechDiscoveriaDB').collection('users');
         const productsCollection = client.db('TechDiscoveriaDB').collection('products');
+        const newProductsCollection = client.db('TechDiscoveriaDB').collection('newProducts');
 
 
         // Custom middleWare's
@@ -68,7 +69,7 @@ async function run() {
         // JsonWebToken Api's
         app.post('/jwt', async (req, res) => {
             const user = req.body;
-            const token = jwt.sign(user, process.env.JWT_TOKEN_SECRET, { expiresIn: "1h" })
+            const token = jwt.sign(user, process.env.JWT_TOKEN_SECRET, { expiresIn: "6hr" })
             res.send({ token })
         })
 
@@ -119,16 +120,36 @@ async function run() {
             res.send(result);
         })
 
-        // products related api's
-
-        app.get('/products', async(req, res)=>{
-            const result = await productsCollection.find().toArray();
+        // User Products Add api's
+        app.post('/userProducts', gateman, async (req, res) => {
+            const product = req.body;
+            const result = await productsCollection.insertOne(product);
             res.send(result);
         })
-        app.get('/products/:id', async(req, res)=>{
+
+        app.get('/userProducts/:email', gateman, async(req, res)=>{
+            const email = req.params.email;
+
+            const filter = {
+                ownerEmail: email
+            }
+            const result = await productsCollection.find(filter).toArray();
+            res.send(result);
+        })
+
+        // products related api's
+
+        app.get('/products', async (req, res) => {
+            const filter = {
+                status: " Accepted"
+            }
+            const result = await productsCollection.find(filter).toArray();
+            res.send(result);
+        })
+        app.get('/products/:id', async (req, res) => {
             const id = req.params.id;
 
-            const query = {_id: new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
 
             const result = await productsCollection.findOne(query);
             res.send(result);
