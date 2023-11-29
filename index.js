@@ -137,6 +137,21 @@ async function run() {
             res.send(result);
         })
 
+        app.put('/userProducts/:id', gateman, async(req, res)=>{
+            const bodyDoc = req.body;
+            const id = req.params.id;
+            const filter = {_id: new ObjectId(id)};
+            const options = { upsert: true }
+
+            const updatedDoc = {
+                $set: {...bodyDoc}
+            }
+
+            const result = await productsCollection.updateOne(filter, updatedDoc, options);
+
+            res.send(result);
+        })
+
         // products related api's
 
         app.get('/products', async (req, res) => {
