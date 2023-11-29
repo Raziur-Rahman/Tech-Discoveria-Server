@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 require('dotenv').config();
+const stripe = require("stripe")(`${process.env.STRIPE_SECRET_KEY}`);
 const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
@@ -10,6 +11,7 @@ const port = process.env.PORT || 5000;
 // middleware 
 app.use(cors());
 app.use(express.json());
+app.use(express.static("public"));
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.idotoa5.mongodb.net/?retryWrites=true&w=majority`;
@@ -48,8 +50,7 @@ async function run() {
 
         const usersCollection = client.db('TechDiscoveriaDB').collection('users');
         const productsCollection = client.db('TechDiscoveriaDB').collection('products');
-        const newProductsCollection = client.db('TechDiscoveriaDB').collection('newProducts');
-
+        const paymentsCollection = client.db('TechDiscoveriaDB').collection('payments');
 
         // Custom middleWare's
         const verifyAdmin = async (req, res, next) => {
@@ -80,13 +81,22 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/users/:email', gateman, async (req, res) => {
+        app.get('/users/role/:email', gateman, async (req, res) => {
             const email = req.params.email;
             const query = {
                 email: email
             }
             const result = await usersCollection.findOne(query);
             res.send(result?.role);
+        })
+
+        app.get('/users/:email', gateman, async (req, res) => {
+            const email = req.params.email;
+            const query = {
+                email: email
+            }
+            const result = await usersCollection.findOne(query);
+            res.send(result);
         })
 
         app.post('/users', async (req, res) => {
@@ -120,16 +130,31 @@ async function run() {
             res.send(result);
         })
 
-        // User Products Add api's
+        app.patch('/users/:email', async (req, res) => {
+            const email = req.params.email;
+            const data = req.body;
+            console.log(email, data);
+            const filter = { email: email }
+            const updatedDoc = {
+                $set: {
+                    Membership: data.Membership
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedDoc);
+
+            res.send(result);
+
+        })
+
+        // User Products api's
         app.post('/userProducts', gateman, async (req, res) => {
             const product = req.body;
             const result = await productsCollection.insertOne(product);
             res.send(result);
         })
 
-        app.get('/userProducts/:email', gateman, async(req, res)=>{
+        app.get('/userProducts/:email', gateman, async (req, res) => {
             const email = req.params.email;
-
             const filter = {
                 ownerEmail: email
             }
@@ -137,20 +162,29 @@ async function run() {
             res.send(result);
         })
 
-        app.put('/userProducts/:id', gateman, async(req, res)=>{
+        app.put('/userProducts/:id', gateman, async (req, res) => {
             const bodyDoc = req.body;
             const id = req.params.id;
-            const filter = {_id: new ObjectId(id)};
+            const filter = { _id: new ObjectId(id) };
             const options = { upsert: true }
 
             const updatedDoc = {
-                $set: {...bodyDoc}
+                $set: { ...bodyDoc }
             }
 
             const result = await productsCollection.updateOne(filter, updatedDoc, options);
 
             res.send(result);
         })
+
+        app.delete("/userProducts/:id", gateman, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+
+            const result = await productsCollection.deleteOne(query);
+            res.send(result);
+        })
+
 
         // products related api's
 
@@ -163,11 +197,45 @@ async function run() {
         })
         app.get('/products/:id', async (req, res) => {
             const id = req.params.id;
-
             const query = { _id: new ObjectId(id) };
 
             const result = await productsCollection.findOne(query);
             res.send(result);
+        })
+
+        // Payment's Related Api's
+        app.post('/create_payment_intent', async (req, res) => {
+            const { price } = req.body;
+
+            const amount = parseInt(price * 100);
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                payment_method_types: ['card'],
+            })
+
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            })
+        })
+
+        app.post('/payments', gateman, async (req, res) => {
+            const payment = req.body;
+            const result = await paymentsCollection.insertOne(payment);
+
+            const email = req.decoded.email;
+
+            const filter = { email: email }
+            const updatedDoc = {
+                $set: {
+                    Membership: "Subscribed"
+                }
+            }
+            const userUpdate = await usersCollection.updateOne(filter, updatedDoc);
+
+            res.send({ result, userUpdate });
+
         })
 
 
