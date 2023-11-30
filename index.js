@@ -46,7 +46,7 @@ const gateman = (req, res, next) => {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
 
         const usersCollection = client.db('TechDiscoveriaDB').collection('users');
         const productsCollection = client.db('TechDiscoveriaDB').collection('products');
@@ -130,7 +130,7 @@ async function run() {
             res.send(result);
         })
 
-        app.patch('/users/:email', async (req, res) => {
+        app.patch('/users/:email', gateman, async (req, res) => {
             const email = req.params.email;
             const data = req.body;
             console.log(email, data);
@@ -149,6 +149,16 @@ async function run() {
         // Products Related Api's here
         // User Products api's
         app.post('/userProducts', gateman, async (req, res) => {
+
+            const email = req.decoded.email;
+            const user = await usersCollection.findOne({email: email});
+
+            const isAdded = await productsCollection.find({ownerEmail: email}).toArray();
+
+            if(isAdded.length === 1 && user.Membership !== "Subscribed" ){
+                return res.send({massage: "post limite Over, buy MemberShip"})
+            }
+
             const product = req.body;
             const result = await productsCollection.insertOne(product);
             res.send(result);
@@ -232,7 +242,7 @@ async function run() {
             const filter = {
                 status: " Accepted" 
             }
-            
+
             const result = await productsCollection.find(filter).skip(page * size).limit(size).toArray();
             res.send(result);
         })
@@ -244,6 +254,19 @@ async function run() {
             const result = await productsCollection.find(filter).toArray();
             const count = result?.length;
             res.send({ count });
+        })
+
+        app.get('/searchProducts', async(req, res)=>{
+            const data = req.query;
+            const filter = {
+                tags: {
+                    $elemMatch: {
+                        $eq: data.search
+                    }
+                }
+            }
+            const result = await productsCollection.find(filter).toArray();
+            res.send(result);
         })
 
         app.get('/products', async (req, res) => {
@@ -318,10 +341,29 @@ async function run() {
 
         })
 
+        // data for Pie chart
+        app.get('/site-stats', async(req, res)=>{
+            const users = await usersCollection.estimatedDocumentCount();
+            const Products = await productsCollection.find().toArray();
+            const totalProducts = Products.length;
+            let totalReviews = 0;
+            Products.forEach(item =>{
+                totalReviews = totalReviews + item.reviews.length
+            })
+
+            const data =[
+                {category: "Total Products", value: totalProducts},
+                {category: "Total Users", value: users},
+                {category: "Total Reviews", value: totalReviews}
+            ]
+
+            res.send(data)
+        })
+
 
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // await client.db("admin").command({ ping: 1 });
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
