@@ -146,6 +146,7 @@ async function run() {
 
         })
 
+        // Products Related Api's here
         // User Products api's
         app.post('/userProducts', gateman, async (req, res) => {
             const product = req.body;
@@ -159,6 +160,41 @@ async function run() {
                 ownerEmail: email
             }
             const result = await productsCollection.find(filter).toArray();
+            res.send(result);
+        })
+
+        app.get('/userProducts', gateman, async (req, res) => {
+            const query = req.query;
+            let result = [];
+
+            if (query?.category) {
+                result = await productsCollection.find(query).toArray();
+            }
+            else {
+                result = await productsCollection.aggregate([
+                    {
+                        $project: {
+                            originalDoc: '$$ROOT',
+                            customSortField: {
+                                $cond: {
+                                    if: { $eq: ['$status', 'pending'] },
+                                    then: 1,
+                                    else: 2
+                                }
+                            }
+                        }
+                    },
+                    {
+                        $sort: { customSortField: 1 }
+                    },
+                    {
+                        $project: {
+                            originalDoc: 1,
+                            _id: 0
+                        }
+                    }
+                ]).toArray();
+            }
             res.send(result);
         })
 
@@ -186,7 +222,7 @@ async function run() {
         })
 
 
-        // products related api's
+        // products api's
 
         app.get('/products', async (req, res) => {
             const filter = {
@@ -195,22 +231,22 @@ async function run() {
             const result = await productsCollection.find(filter).toArray();
             res.send(result);
         })
-        app.get('/products/:id', async (req, res) => {
+        app.get('/products/:id', gateman, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
 
             const result = await productsCollection.findOne(query);
             res.send(result);
         })
-        app.patch('/products/:id', async(req, res)=>{
+        app.patch('/products/:id', gateman, async (req, res) => {
             const id = req.params.id;
             const bodyData = req.body;
-            const filter = {_id: new ObjectId(id)};
+            const filter = { _id: new ObjectId(id) };
 
-            const {key, ...rest} = bodyData;
+            const { key, ...rest } = bodyData;
 
             let updatedDoc = {
-                $set : {...rest}
+                $set: { ...rest }
             };
             // console.log(id, key, rest, updatedDoc);
             const result = await productsCollection.updateOne(filter, updatedDoc);
@@ -262,6 +298,7 @@ async function run() {
     }
 }
 run().catch(console.dir);
+
 
 
 app.get('/', (req, res) => {
