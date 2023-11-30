@@ -163,7 +163,10 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/userProducts', gateman, async (req, res) => {
+        app.get('/userProducts', async (req, res) => {
+
+
+
             const query = req.query;
             let result = [];
 
@@ -223,13 +226,40 @@ async function run() {
 
 
         // products api's
-
-        app.get('/products', async (req, res) => {
+        app.get('/page/products', async (req, res) => {
+            const page = parseInt(req.query.page);
+            const size = parseInt(req.query.size);
             const filter = {
-                status: " Accepted"
+                status: " Accepted" 
+            }
+            
+            const result = await productsCollection.find(filter).skip(page * size).limit(size).toArray();
+            res.send(result);
+        })
+
+        app.get('/productsCount', async (req, res) => {
+            const filter = {
+                status: " Accepted" 
             }
             const result = await productsCollection.find(filter).toArray();
-            res.send(result);
+            const count = result?.length;
+            res.send({ count });
+        })
+
+        app.get('/products', async (req, res) => {
+            const query = req.query;
+
+            let result = [];
+
+            if (query?.category === "Featured") {
+                result = await productsCollection.find(query).sort({ timestamp: -1 }).toArray();
+                return res.send(result);
+            }
+            else if (query?.category === "Trending") {
+                result = await productsCollection.find(query).sort({ upvotes: -1 }).toArray();
+                return res.send(result);
+            }
+
         })
         app.get('/products/:id', gateman, async (req, res) => {
             const id = req.params.id;
