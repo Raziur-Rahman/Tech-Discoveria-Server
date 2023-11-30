@@ -202,6 +202,20 @@ async function run() {
             const result = await productsCollection.findOne(query);
             res.send(result);
         })
+        app.patch('/products/:id', async(req, res)=>{
+            const id = req.params.id;
+            const bodyData = req.body;
+            const filter = {_id: new ObjectId(id)};
+
+            const {key, ...rest} = bodyData;
+
+            let updatedDoc = {
+                $set : {...rest}
+            };
+            // console.log(id, key, rest, updatedDoc);
+            const result = await productsCollection.updateOne(filter, updatedDoc);
+            res.send(result);
+        })
 
         // Payment's Related Api's
         app.post('/create_payment_intent', async (req, res) => {
